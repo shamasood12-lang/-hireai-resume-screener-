@@ -16,6 +16,54 @@ st.set_page_config(
     layout="centered"
 )
 
+# -----------------------------------
+# CUSTOM DARK THEME
+# -----------------------------------
+st.markdown("""
+    <style>
+
+    .stApp {
+        background-color: #0f1117;
+        color: white;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        color: #00ffd5;
+    }
+
+    .stButton>button {
+        background-color: #00ffd5;
+        color: black;
+        border-radius: 10px;
+        height: 3em;
+        width: 100%;
+        font-weight: bold;
+        border: none;
+    }
+
+    .stTextInput>div>div>input,
+    .stTextArea textarea {
+        background-color: #262730;
+        color: white;
+        border-radius: 10px;
+    }
+
+    .stFileUploader {
+        background-color: #262730;
+        padding: 15px;
+        border-radius: 10px;
+    }
+
+    .css-1d391kg {
+        background-color: #161a28;
+    }
+
+    </style>
+""", unsafe_allow_html=True)
+
+# -----------------------------------
+# TITLE
+# -----------------------------------
 st.title("HireAI - Resume Screening System")
 st.subheader("AI-powered resume and job matching")
 
@@ -31,7 +79,7 @@ if "shortlisted" not in st.session_state:
 
 
 # -----------------------------------
-# SINGLE RESUME MODE
+# SINGLE RESUME ANALYSIS
 # -----------------------------------
 st.markdown("## 📄 Single Resume Analysis")
 
@@ -47,7 +95,10 @@ if uploaded_file:
     pdf_reader = PyPDF2.PdfReader(uploaded_file)
 
     for page in pdf_reader.pages:
-        resume_text += page.extract_text()
+        extracted = page.extract_text()
+
+        if extracted:
+            resume_text += extracted
 
     st.success("✅ Resume uploaded successfully")
 
@@ -55,6 +106,9 @@ if uploaded_file:
 job_description = st.text_area("Enter Job Description")
 
 
+# -----------------------------------
+# SINGLE ANALYSIS BUTTON
+# -----------------------------------
 if st.button("Analyze Match"):
 
     if resume_text and job_description:
@@ -71,22 +125,83 @@ if st.button("Analyze Match"):
 
         final_score = (score * 0.6) + (ml_score * 0.4)
 
-        st.subheader("📊 Match Result")
+        st.markdown("## 📊 Match Result")
 
         col1, col2, col3 = st.columns(3)
 
-        col1.metric("Keyword", f"{score:.2f}%")
-        col2.metric("ML Score", f"{ml_score:.2f}%")
-        col3.metric("Final", f"{final_score:.2f}%")
+        # -----------------------------------
+        # CARD 1
+        # -----------------------------------
+        with col1:
+            st.markdown(f"""
+            <div style="
+                background:#1e293b;
+                padding:20px;
+                border-radius:15px;
+                text-align:center;
+            ">
+                <h3 style='color:#38bdf8;'>Keyword</h3>
+                <h1 style='color:white;'>{score:.2f}%</h1>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # -----------------------------------
+        # CARD 2
+        # -----------------------------------
+        with col2:
+            st.markdown(f"""
+            <div style="
+                background:#1e293b;
+                padding:20px;
+                border-radius:15px;
+                text-align:center;
+            ">
+                <h3 style='color:#a78bfa;'>ML Score</h3>
+                <h1 style='color:white;'>{ml_score:.2f}%</h1>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # -----------------------------------
+        # CARD 3
+        # -----------------------------------
+        with col3:
+            st.markdown(f"""
+            <div style="
+                background:#1e293b;
+                padding:20px;
+                border-radius:15px;
+                text-align:center;
+            ">
+                <h3 style='color:#34d399;'>Final</h3>
+                <h1 style='color:white;'>{final_score:.2f}%</h1>
+            </div>
+            """, unsafe_allow_html=True)
 
         st.progress(int(final_score))
 
+        # -----------------------------------
+        # MATCHED SKILLS
+        # -----------------------------------
         st.markdown("### ✅ Matched Skills")
-        st.write(", ".join(matched) if matched else "No matched skills")
 
+        if matched:
+            st.write(", ".join(matched))
+        else:
+            st.write("No matched skills")
+
+        # -----------------------------------
+        # MISSING SKILLS
+        # -----------------------------------
         st.markdown("### ❌ Missing Skills")
-        st.write(", ".join(missing) if missing else "No missing skills")
 
+        if missing:
+            st.write(", ".join(missing))
+        else:
+            st.write("No missing skills")
+
+        # -----------------------------------
+        # RESULT CATEGORY
+        # -----------------------------------
         if final_score >= 80:
             st.success("🔥 Strong Match")
 
@@ -112,6 +227,9 @@ uploaded_resumes = st.file_uploader(
 )
 
 
+# -----------------------------------
+# ANALYZE ALL BUTTON
+# -----------------------------------
 if st.button("Analyze All Resumes"):
 
     results = []
@@ -134,7 +252,10 @@ if st.button("Analyze All Resumes"):
                 pdf_reader = PyPDF2.PdfReader(uploaded_resume)
 
                 for page in pdf_reader.pages:
-                    text += page.extract_text()
+                    extracted = page.extract_text()
+
+                    if extracted:
+                        text += extracted
 
             # -----------------------------------
             # DOCX HANDLING
@@ -148,12 +269,11 @@ if st.button("Analyze All Resumes"):
 
                 text = extract_text_from_docx(temp_path)
 
-                # optional cleanup
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
 
             # -----------------------------------
-            # MATCH SCORING
+            # MATCHING
             # -----------------------------------
             score, matched, missing, resume_skills, required_skills = get_match_score(
                 text,
@@ -180,6 +300,9 @@ if st.button("Analyze All Resumes"):
                 "missing": missing
             })
 
+        # -----------------------------------
+        # SORT RESULTS
+        # -----------------------------------
         results.sort(
             key=lambda x: x["final_score"],
             reverse=True
@@ -207,15 +330,65 @@ if st.session_state.results:
 
         col1, col2, col3 = st.columns(3)
 
-        col1.metric("Keyword", f"{score:.2f}%")
-        col2.metric("ML", f"{ml_score:.2f}%")
-        col3.metric("Final", f"{final_score:.2f}%")
+        # -----------------------------------
+        # CARD 1
+        # -----------------------------------
+        with col1:
+            st.markdown(f"""
+            <div style="
+                background:#1e293b;
+                padding:20px;
+                border-radius:15px;
+                text-align:center;
+            ">
+                <h3 style='color:#38bdf8;'>Keyword</h3>
+                <h1 style='color:white;'>{score:.2f}%</h1>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # -----------------------------------
+        # CARD 2
+        # -----------------------------------
+        with col2:
+            st.markdown(f"""
+            <div style="
+                background:#1e293b;
+                padding:20px;
+                border-radius:15px;
+                text-align:center;
+            ">
+                <h3 style='color:#a78bfa;'>ML</h3>
+                <h1 style='color:white;'>{ml_score:.2f}%</h1>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # -----------------------------------
+        # CARD 3
+        # -----------------------------------
+        with col3:
+            st.markdown(f"""
+            <div style="
+                background:#1e293b;
+                padding:20px;
+                border-radius:15px;
+                text-align:center;
+            ">
+                <h3 style='color:#34d399;'>Final</h3>
+                <h1 style='color:white;'>{final_score:.2f}%</h1>
+            </div>
+            """, unsafe_allow_html=True)
 
         st.progress(int(final_score))
 
+        # -----------------------------------
+        # IMPROVEMENT SUGGESTION
+        # -----------------------------------
         if missing:
             st.info(f"💡 Improve by learning: {', '.join(missing)}")
 
+        # -----------------------------------
+        # RESULT CATEGORY
+        # -----------------------------------
         if final_score >= 80:
             st.success("🔥 Strong Match")
 
