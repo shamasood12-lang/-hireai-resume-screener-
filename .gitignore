@@ -1,5 +1,16 @@
 __pycache__/
 *.pyc
+
 .env
-venv/
+
 .streamlit/
+
+venv/
+env/
+
+*.docx
+*.pdf
+
+resumes/
+
+.DS_Store
