@@ -14,3 +14,7 @@ env/
 resumes/
 
 .DS_Store
+
+node_modules/
+.next/
+backup_working_version/
