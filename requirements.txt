@@ -3,4 +3,5 @@ pandas
 PyPDF2
 scikit-learn
 python-docx
-
+google-generativeai
+python-dotenv

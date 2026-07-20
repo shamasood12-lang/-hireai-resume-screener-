@@ -2,11 +2,13 @@ import streamlit as st
 import pandas as pd
 import PyPDF2
 import os
-
+from dotenv import load_dotenv
 from matcher import get_match_score
 from ml_model import calculate_similarity
 from extractor import extract_text_from_docx
+from gemini_analyzer import get_ai_analysis
 
+load_dotenv()
 
 # -----------------------------------
 # PAGE CONFIG
@@ -84,23 +86,44 @@ if "shortlisted" not in st.session_state:
 st.markdown("## 📄 Single Resume Analysis")
 
 uploaded_file = st.file_uploader(
-    "Upload Resume (PDF)",
-    type=["pdf"]
+    "Upload Resume (PDF or DOCX)",
+    type=["pdf", "docx"],
+    key="single_resume"
 )
 
 resume_text = ""
 
 if uploaded_file:
 
-    pdf_reader = PyPDF2.PdfReader(uploaded_file)
+    file_name = uploaded_file.name
 
-    for page in pdf_reader.pages:
-        extracted = page.extract_text()
+    # PDF
+    if file_name.endswith(".pdf"):
 
-        if extracted:
-            resume_text += extracted
+        pdf_reader = PyPDF2.PdfReader(uploaded_file)
+
+        for page in pdf_reader.pages:
+            extracted = page.extract_text()
+
+            if extracted:
+                resume_text += extracted
+
+    # DOCX
+    elif file_name.endswith(".docx"):
+
+        temp_path = f"temp_{file_name}"
+
+        with open(temp_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+
+        resume_text = extract_text_from_docx(temp_path)
+
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
     st.success("✅ Resume uploaded successfully")
+
+    
 
 
 job_description = st.text_area("Enter Job Description")
@@ -119,9 +142,9 @@ if st.button("Analyze Match"):
         )
 
         ml_score = calculate_similarity(
-            " ".join(resume_skills),
-            " ".join(required_skills)
-        )
+    resume_text,
+    job_description
+)
 
         final_score = (score * 0.6) + (ml_score * 0.4)
 
@@ -210,9 +233,30 @@ if st.button("Analyze Match"):
 
         else:
             st.error("❌ Weak Match")
+# -----------------------------------
+# GEMINI AI ANALYSIS
+# -----------------------------------
 
-    else:
-        st.warning("Please upload resume and enter job description.")
+st.markdown("## 🤖 Gemini AI Analysis")
+
+if resume_text and job_description:
+
+    try:
+        api_key = os.getenv("GEMINI_API_KEY")
+
+        ai_result = get_ai_analysis(
+            resume_text,
+            job_description,
+            api_key
+        )
+
+        st.write(ai_result)
+
+    except Exception as e:
+        st.error(f"Gemini Error: {e}")
+
+else:
+    st.warning("Please upload resume and enter job description.")
 
 
 # -----------------------------------
@@ -283,9 +327,9 @@ if st.button("Analyze All Resumes"):
             if resume_skills and required_skills:
 
                 ml_score = calculate_similarity(
-                    " ".join(resume_skills),
-                    " ".join(required_skills)
-                )
+                 text,
+                job_description
+            )
 
             else:
                 ml_score = 0
@@ -293,12 +337,13 @@ if st.button("Analyze All Resumes"):
             final_score = (score * 0.6) + (ml_score * 0.4)
 
             results.append({
-                "file": file_name,
-                "score": score,
-                "ml_score": ml_score,
-                "final_score": final_score,
-                "missing": missing
-            })
+    "file": file_name,
+    "score": score,
+    "ml_score": ml_score,
+    "final_score": final_score,
+    "missing": missing,
+    "resume_text": text
+})
 
         # -----------------------------------
         # SORT RESULTS
@@ -414,8 +459,22 @@ if st.session_state.results:
                 st.session_state.shortlisted.append(candidate_data)
 
             st.success(f"{file} shortlisted!")
+        # -----------------------------------
+        # GEMINI ANALYSIS BUTTON
+        # -----------------------------------
+        if st.button(f"🤖 Analyze {file}", key=f"ai_{i}"):
 
-        st.markdown("---")
+            api_key = os.getenv("GEMINI_API_KEY")
+
+            ai_result = get_ai_analysis(
+                res["resume_text"],
+                job_description,
+                api_key
+            )
+
+            st.markdown("### 🤖 AI Recruiter Review")
+            st.write(ai_result)
+            st.markdown("---")
 
 
 # -----------------------------------
@@ -424,10 +483,18 @@ if st.session_state.results:
 st.markdown("## ⭐ Shortlisted Candidates")
 
 if st.session_state.shortlisted:
-
     df = pd.DataFrame(st.session_state.shortlisted)
+    df = df.sort_values(
+    by="Final Score",
+    ascending=False
+).reset_index(drop=True)
 
-    st.dataframe(df)
+    st.dataframe(df, hide_index=True)
+
+    st.markdown("### 📊 Candidate Comparison")
+
+    chart_df = df.set_index("Name")[['Final Score']]
+    st.bar_chart(chart_df, height=400)
 
     csv = df.to_csv(index=False).encode("utf-8")
 
@@ -437,6 +504,5 @@ if st.session_state.shortlisted:
         file_name="shortlisted_candidates.csv",
         mime="text/csv"
     )
-
 else:
     st.info("No candidates shortlisted yet.")

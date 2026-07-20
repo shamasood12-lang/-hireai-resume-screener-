@@ -1,14 +1,19 @@
 from skills import SKILLS_DB
 
+import re
+from skills import SKILLS_DB
+
 def extract_skills(text):
     text = text.lower()
     found = []
 
     for skill in SKILLS_DB:
-        if skill in text:
+        pattern = r"\b" + re.escape(skill.lower()) + r"\b"
+
+        if re.search(pattern, text):
             found.append(skill)
-    
-    return [skill for skill in set(found) if skill.strip()]
+
+    return list(set(found))
 
 
 def get_match_score(resume_text, job_desc):
